@@ -8,6 +8,8 @@ let currentYear = new Date().getFullYear();
 let currentMonth = new Date().getMonth(); // 0-indexed
 let allTransactions = [];
 let allCategories = [];
+let allSchedules = [];
+let scheduleSelectedDate = new Date();
 let editingId = null;
 
 const MONTH_NAMES = [
@@ -36,6 +38,7 @@ function init() {
   setupMonthYearFilters();
   setupForms();
   setupCalendarControls();
+  setupSchedule();
   setupLogout();
 
   loadData();
@@ -152,6 +155,10 @@ function setupNavigation() {
       if (tab.dataset.section === 'summary') {
         loadSummary();
       }
+      if (tab.dataset.section === 'schedule') {
+        renderTimetable();
+        renderScheduleTable();
+      }
     });
   });
 }
@@ -186,19 +193,27 @@ function setupMonthYearFilters() {
   });
 
   document.getElementById('summaryLoadBtn').addEventListener('click', loadSummary);
+
+  populateMonthSelect(document.getElementById('scheduleFilterMonth'), m);
+  populateYearSelect(document.getElementById('scheduleFilterYear'), y);
+  document.getElementById('scheduleFilterMonth').addEventListener('change', renderScheduleTable);
+  document.getElementById('scheduleFilterYear').addEventListener('change', renderScheduleTable);
+  document.getElementById('scheduleSearch').addEventListener('input', renderScheduleTable);
 }
 
 // ==================== DATA LOADING ====================
 async function loadData() {
   showLoading(true);
   try {
-    const [txResult, catResult] = await Promise.all([
+    const [txResult, catResult, schResult] = await Promise.all([
       apiGetTransactions(currentUser.id),
-      apiGetCategories()
+      apiGetCategories(),
+      apiGetSchedules(currentUser.id).catch(() => ({ data: [] }))
     ]);
 
     allTransactions = txResult.data || [];
     allCategories = catResult.data || [];
+    allSchedules = schResult.data || [];
 
     populateCategorySelects();
     renderDashboard();
@@ -206,6 +221,8 @@ async function loadData() {
     renderTransactionTable('family');
     renderTransactionTable('income');
     renderCategoryTable();
+    renderTimetable();
+    renderScheduleTable();
   } catch (error) {
     showToast('Lỗi tải dữ liệu: ' + error.message, 'error');
   } finally {
@@ -311,10 +328,18 @@ function renderCalendar(monthTx) {
   const grid = document.getElementById('calendarGrid');
   document.getElementById('calendarTitle').textContent = `${MONTH_NAMES[currentMonth]} ${currentYear}`;
 
-  // Đếm giao dịch theo ngày
+  // Đếm giao dịch và lịch theo ngày
   const dayCounts = {};
   monthTx.forEach(tx => {
     const key = getDateKey(tx.date);
+    dayCounts[key] = (dayCounts[key] || 0) + 1;
+  });
+  const monthSchedules = allSchedules.filter(s => {
+    const d = new Date(s.date);
+    return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
+  });
+  monthSchedules.forEach(s => {
+    const key = getDateKey(s.date);
     dayCounts[key] = (dayCounts[key] || 0) + 1;
   });
 
@@ -453,12 +478,15 @@ function setupForms() {
   document.getElementById('familyCancelBtn').addEventListener('click', () => resetForm('family'));
   document.getElementById('incomeCancelBtn').addEventListener('click', () => resetForm('income'));
   document.getElementById('categoryCancelBtn').addEventListener('click', () => resetForm('category'));
+  document.getElementById('scheduleForm').addEventListener('submit', handleScheduleSubmit);
+  document.getElementById('scheduleCancelBtn').addEventListener('click', () => resetScheduleForm());
 
   // Đặt ngày mặc định
   const today = toInputDate(new Date());
   document.getElementById('personalDate').value = today;
   document.getElementById('familyDate').value = today;
   document.getElementById('incomeDate').value = today;
+  document.getElementById('scheduleDate').value = today;
 }
 
 // ==================== TRANSACTION CRUD ====================
@@ -878,4 +906,305 @@ function renderYearSummary(container, data, year) {
       </table>
     </div>
   `;
+}
+
+// ==================== SCHEDULE (THỜI KHÓA BIỂU) ====================
+
+/** Khởi tạo module thời khóa biểu */
+function setupSchedule() {
+  document.getElementById('schedulePrevDay').addEventListener('click', () => {
+    scheduleSelectedDate.setDate(scheduleSelectedDate.getDate() - 1);
+    syncScheduleDateInput();
+    renderTimetable();
+  });
+
+  document.getElementById('scheduleNextDay').addEventListener('click', () => {
+    scheduleSelectedDate.setDate(scheduleSelectedDate.getDate() + 1);
+    syncScheduleDateInput();
+    renderTimetable();
+  });
+
+  document.getElementById('scheduleTodayBtn').addEventListener('click', () => {
+    scheduleSelectedDate = new Date();
+    syncScheduleDateInput();
+    renderTimetable();
+  });
+
+  document.getElementById('scheduleDate').addEventListener('change', (e) => {
+    scheduleSelectedDate = new Date(e.target.value + 'T00:00:00');
+    renderTimetable();
+  });
+}
+
+function syncScheduleDateInput() {
+  document.getElementById('scheduleDate').value = toInputDate(scheduleSelectedDate);
+  renderTimetable();
+}
+
+/** Format giờ HH:mm */
+function formatTimeDisplay(timeStr) {
+  if (!timeStr) return '';
+  return String(timeStr).substring(0, 5);
+}
+
+/** Lấy lịch theo ngày đã chọn */
+function getSchedulesForDate(date) {
+  const key = toInputDate(date);
+  return allSchedules
+    .filter(s => String(s.date).split('T')[0] === key)
+    .sort((a, b) => String(a.startTime).localeCompare(String(b.startTime)));
+}
+
+/** Render bảng thời khóa biểu theo giờ (6h - 22h) */
+function renderTimetable() {
+  const container = document.getElementById('timetable');
+  const label = document.getElementById('scheduleDayLabel');
+  if (!container || !label) return;
+
+  const days = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
+  label.textContent = `${days[scheduleSelectedDate.getDay()]}, ${formatDate(scheduleSelectedDate.toISOString())}`;
+
+  const daySchedules = getSchedulesForDate(scheduleSelectedDate);
+
+  let html = '';
+  for (let h = 6; h <= 22; h++) {
+    const timeLabel = String(h).padStart(2, '0') + ':00';
+    const hourStr = String(h).padStart(2, '0');
+
+    const blocks = daySchedules.filter(s => {
+      const startHour = String(s.startTime).substring(0, 2);
+      return startHour === hourStr;
+    });
+
+    html += `<div class="timetable-row">
+      <div class="timetable-time">${timeLabel}</div>
+      <div class="timetable-slot ${blocks.length === 0 ? 'empty' : ''}">`;
+
+    if (blocks.length > 0) {
+      blocks.forEach(s => {
+        html += renderScheduleBlock(s);
+      });
+    }
+
+    html += `</div></div>`;
+  }
+
+  if (daySchedules.length === 0) {
+    html += '<div class="timetable-empty">Chưa có lịch làm việc trong ngày này</div>';
+  }
+
+  container.innerHTML = html;
+}
+
+/** Map loại lịch sang class CSS */
+function getScheduleTypeClass(type) {
+  const map = { 'Công việc': 'work', 'Học tập': 'study', 'Họp': 'meeting', 'Cá nhân': 'personal', 'Khác': 'other' };
+  return 'type-' + (map[type] || 'other');
+}
+
+/** Render 1 khối lịch */
+function renderScheduleBlock(s) {
+  const completed = s.completed === true || s.completed === 'TRUE' || s.completed === 'true';
+  const typeClass = getScheduleTypeClass(s.type);
+  const meta = [s.location, s.description].filter(Boolean).join(' · ');
+
+  return `
+    <div class="schedule-block ${typeClass} ${completed ? 'completed' : ''}">
+      <input type="checkbox" ${completed ? 'checked' : ''} onchange="toggleScheduleComplete('${s.id}', this.checked)" title="Hoàn thành">
+      <span class="schedule-block-time">${formatTimeDisplay(s.startTime)} - ${formatTimeDisplay(s.endTime)}</span>
+      <div class="schedule-block-body">
+        <div class="schedule-block-title">${s.title}</div>
+        ${meta ? `<div class="schedule-block-meta">${meta}</div>` : ''}
+      </div>
+      <span class="badge-schedule">${s.type || 'Khác'}</span>
+      <div class="schedule-block-actions">
+        <button class="btn-icon" onclick="editSchedule('${s.id}')">Sửa</button>
+        <button class="btn-icon" onclick="deleteScheduleItem('${s.id}')">Xóa</button>
+      </div>
+    </div>`;
+}
+
+/** Render bảng danh sách lịch tháng */
+function renderScheduleTable() {
+  const tbody = document.querySelector('#scheduleTable tbody');
+  if (!tbody) return;
+
+  const month = Number(document.getElementById('scheduleFilterMonth').value);
+  const year = Number(document.getElementById('scheduleFilterYear').value);
+  const search = document.getElementById('scheduleSearch').value.toLowerCase();
+
+  let filtered = allSchedules.filter(s => {
+    const d = new Date(s.date);
+    return d.getFullYear() === year && d.getMonth() + 1 === month;
+  });
+
+  if (search) {
+    filtered = filtered.filter(s =>
+      (s.title || '').toLowerCase().includes(search) ||
+      (s.location || '').toLowerCase().includes(search) ||
+      (s.type || '').toLowerCase().includes(search) ||
+      (s.description || '').toLowerCase().includes(search)
+    );
+  }
+
+  filtered.sort((a, b) => {
+    const d = String(a.date).localeCompare(String(b.date));
+    return d !== 0 ? d : String(a.startTime).localeCompare(String(b.startTime));
+  });
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#9e9e9e">Không có dữ liệu</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(s => {
+    const completed = s.completed === true || s.completed === 'TRUE' || s.completed === 'true';
+    return `<tr>
+      <td>${formatDate(s.date)}</td>
+      <td>${formatTimeDisplay(s.startTime)} - ${formatTimeDisplay(s.endTime)}</td>
+      <td style="font-weight:600">${s.title}</td>
+      <td><span class="badge-schedule">${s.type || 'Khác'}</span></td>
+      <td>${s.location || ''}</td>
+      <td><input type="checkbox" ${completed ? 'checked' : ''} onchange="toggleScheduleComplete('${s.id}', this.checked)"></td>
+      <td class="table-actions">
+        <button class="btn-icon" onclick="editSchedule('${s.id}')">Sửa</button>
+        <button class="btn-icon" onclick="deleteScheduleItem('${s.id}')">Xóa</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+/** Thêm / sửa lịch */
+async function handleScheduleSubmit(e) {
+  e.preventDefault();
+
+  const fields = [
+    { id: 'scheduleDate' },
+    { id: 'scheduleStart' },
+    { id: 'scheduleEnd' },
+    { id: 'scheduleTitle' }
+  ];
+
+  if (!validateFormFields(fields)) {
+    showToast('Vui lòng điền đầy đủ thông tin bắt buộc', 'error');
+    return;
+  }
+
+  const start = document.getElementById('scheduleStart').value;
+  const end = document.getElementById('scheduleEnd').value;
+  if (start >= end) {
+    showToast('Giờ kết thúc phải sau giờ bắt đầu', 'error');
+    return;
+  }
+
+  const id = document.getElementById('scheduleId').value;
+  const schedule = {
+    userId: currentUser.id,
+    date: document.getElementById('scheduleDate').value,
+    startTime: start,
+    endTime: end,
+    title: document.getElementById('scheduleTitle').value.trim(),
+    type: document.getElementById('scheduleType').value,
+    description: document.getElementById('scheduleDesc').value.trim(),
+    location: document.getElementById('scheduleLocation').value.trim(),
+    note: document.getElementById('scheduleNote').value.trim(),
+    completed: false
+  };
+
+  showLoading(true);
+  try {
+    if (id) {
+      const existing = allSchedules.find(s => s.id === id);
+      schedule.completed = existing ? existing.completed : false;
+      await apiUpdateSchedule(id, schedule);
+      const idx = allSchedules.findIndex(s => s.id === id);
+      if (idx >= 0) allSchedules[idx] = { ...allSchedules[idx], ...schedule, id };
+      showToast('Cập nhật lịch thành công', 'success');
+    } else {
+      const result = await apiAddSchedule(schedule);
+      allSchedules.push(result.data);
+      showToast('Thêm lịch thành công', 'success');
+    }
+
+    resetScheduleForm();
+    scheduleSelectedDate = new Date(schedule.date + 'T00:00:00');
+    renderDashboard();
+    renderTimetable();
+    renderScheduleTable();
+  } catch (error) {
+    showToast('Lỗi: ' + error.message, 'error');
+  } finally {
+    showLoading(false);
+  }
+}
+
+function resetScheduleForm() {
+  document.getElementById('scheduleForm').reset();
+  document.getElementById('scheduleId').value = '';
+  document.getElementById('scheduleDate').value = toInputDate(scheduleSelectedDate);
+  document.getElementById('scheduleFormTitle').textContent = 'Thêm lịch làm việc';
+  document.getElementById('scheduleCancelBtn').style.display = 'none';
+}
+
+function editSchedule(id) {
+  const s = allSchedules.find(item => item.id === id);
+  if (!s) return;
+
+  document.getElementById('scheduleId').value = id;
+  document.getElementById('scheduleDate').value = String(s.date).split('T')[0];
+  document.getElementById('scheduleStart').value = formatTimeDisplay(s.startTime);
+  document.getElementById('scheduleEnd').value = formatTimeDisplay(s.endTime);
+  document.getElementById('scheduleTitle').value = s.title || '';
+  document.getElementById('scheduleType').value = s.type || 'Công việc';
+  document.getElementById('scheduleDesc').value = s.description || '';
+  document.getElementById('scheduleLocation').value = s.location || '';
+  document.getElementById('scheduleNote').value = s.note || '';
+  document.getElementById('scheduleFormTitle').textContent = 'Sửa lịch làm việc';
+  document.getElementById('scheduleCancelBtn').style.display = '';
+
+  scheduleSelectedDate = new Date(String(s.date).split('T')[0] + 'T00:00:00');
+
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.section').forEach(sec => sec.classList.remove('active'));
+  document.querySelector('[data-section="schedule"]').classList.add('active');
+  document.getElementById('section-schedule').classList.add('active');
+
+  renderTimetable();
+  document.getElementById('scheduleForm').scrollIntoView({ behavior: 'smooth' });
+}
+
+async function deleteScheduleItem(id) {
+  if (!confirm('Bạn có chắc muốn xóa mục lịch này?')) return;
+
+  showLoading(true);
+  try {
+    await apiDeleteSchedule(id);
+    allSchedules = allSchedules.filter(s => s.id !== id);
+    showToast('Xóa lịch thành công', 'success');
+    renderDashboard();
+    renderTimetable();
+    renderScheduleTable();
+  } catch (error) {
+    showToast('Lỗi: ' + error.message, 'error');
+  } finally {
+    showLoading(false);
+  }
+}
+
+async function toggleScheduleComplete(id, checked) {
+  const s = allSchedules.find(item => item.id === id);
+  if (!s) return;
+
+  showLoading(true);
+  try {
+    await apiUpdateSchedule(id, { ...s, completed: checked });
+    s.completed = checked;
+    showToast('Cập nhật trạng thái thành công', 'success');
+    renderTimetable();
+    renderScheduleTable();
+  } catch (error) {
+    showToast('Lỗi: ' + error.message, 'error');
+  } finally {
+    showLoading(false);
+  }
 }

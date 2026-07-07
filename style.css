@@ -803,4 +803,151 @@ body {
   .login-card { padding: 28px 20px; }
   .stats-grid { grid-template-columns: 1fr; }
   .calendar-controls h2 { font-size: 1rem; min-width: auto; }
+  .schedule-day-controls { flex-wrap: wrap; }
+  .timetable-time { width: 50px; font-size: 0.7rem; }
+}
+
+/* ==================== TIMETABLE (THỜI KHÓA BIỂU) ==================== */
+.schedule-day-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.schedule-day-label {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--purple-dark);
+  min-width: 200px;
+  text-align: center;
+}
+
+.timetable {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--white);
+}
+
+.timetable-row {
+  display: flex;
+  min-height: 52px;
+  border-bottom: 1px dashed var(--gray-200);
+}
+
+.timetable-row:last-child { border-bottom: none; }
+
+.timetable-time {
+  width: 64px;
+  flex-shrink: 0;
+  padding: 10px 8px;
+  background: linear-gradient(135deg, var(--pink-light), var(--purple-light));
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--purple-dark);
+  text-align: center;
+  border-right: var(--border);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 12px;
+}
+
+.timetable-slot {
+  flex: 1;
+  padding: 6px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  justify-content: center;
+  min-height: 52px;
+}
+
+.timetable-slot.empty {
+  background: var(--gray-50);
+}
+
+.schedule-block {
+  background: linear-gradient(135deg, var(--white), var(--purple-light));
+  border: var(--border);
+  border-left: 4px solid var(--purple);
+  border-radius: 8px;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.85rem;
+  transition: opacity 0.2s;
+}
+
+.schedule-block.completed {
+  opacity: 0.55;
+}
+
+.schedule-block.completed .schedule-block-title {
+  text-decoration: line-through;
+  color: var(--gray-500);
+}
+
+.schedule-block.type-work { border-left-color: #9c27b0; }
+.schedule-block.type-study { border-left-color: #42a5f5; }
+.schedule-block.type-meeting { border-left-color: #ffa726; }
+.schedule-block.type-personal { border-left-color: #66bb6a; }
+.schedule-block.type-other { border-left-color: #9e9e9e; }
+
+.schedule-block-time {
+  font-weight: 700;
+  color: var(--purple-dark);
+  white-space: nowrap;
+  font-size: 0.8rem;
+}
+
+.schedule-block-body { flex: 1; }
+
+.schedule-block-title {
+  font-weight: 600;
+  color: var(--gray-900);
+}
+
+.schedule-block-meta {
+  font-size: 0.75rem;
+  color: var(--gray-500);
+  margin-top: 2px;
+}
+
+.schedule-block-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.schedule-block input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--purple-dark);
+  cursor: pointer;
+}
+
+.badge-schedule {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  background: var(--purple-light);
+  color: var(--purple-dark);
+}
+
+.timetable-empty {
+  padding: 40px;
+  text-align: center;
+  color: var(--gray-500);
+  font-style: italic;
 }

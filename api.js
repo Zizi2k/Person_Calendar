@@ -107,3 +107,25 @@ async function apiGetSummaryByMonth(userId, year, month) {
 async function apiGetSummaryByYear(userId, year) {
   return apiRequest('getSummaryByYear', { userId, year });
 }
+
+// ==================== SCHEDULES ====================
+
+/** Lấy thời khóa biểu */
+async function apiGetSchedules(userId, filters = {}) {
+  return apiRequest('getSchedules', { userId, ...filters });
+}
+
+/** Thêm mục thời khóa biểu */
+async function apiAddSchedule(schedule) {
+  return apiRequest('addSchedule', { schedule });
+}
+
+/** Cập nhật thời khóa biểu */
+async function apiUpdateSchedule(id, schedule) {
+  return apiRequest('updateSchedule', { id, schedule });
+}
+
+/** Xóa thời khóa biểu */
+async function apiDeleteSchedule(id) {
+  return apiRequest('deleteSchedule', { id });
+}

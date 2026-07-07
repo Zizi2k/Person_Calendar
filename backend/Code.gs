@@ -16,7 +16,8 @@ const SPREADSHEET_ID = '16q1YounE7qvkllH7Df6XxtlIS_jXz5txmH2UO3Xf9eI';
 const SHEETS = {
   USERS: 'Users',
   TRANSACTIONS: 'Transactions',
-  CATEGORIES: 'Categories'
+  CATEGORIES: 'Categories',
+  SCHEDULES: 'Schedules'
 };
 
 // ==================== HTTP HANDLERS ====================
@@ -71,6 +72,18 @@ function doPost(e) {
         break;
       case 'getSummaryByYear':
         result = getSummaryByYear(body.userId, body.year);
+        break;
+      case 'getSchedules':
+        result = getSchedules(body.userId, body);
+        break;
+      case 'addSchedule':
+        result = addSchedule(body.schedule);
+        break;
+      case 'updateSchedule':
+        result = updateSchedule(body.id, body.schedule);
+        break;
+      case 'deleteSchedule':
+        result = deleteSchedule(body.id);
         break;
       default:
         return createResponse({ success: false, message: 'Action không hợp lệ: ' + action });
@@ -270,6 +283,43 @@ function setupSheets() {
         txSheet.appendRow([generateId()].concat(row).concat([now]));
       });
       Logger.log('Đã thêm giao dịch mẫu');
+    }
+
+    // --- Schedules (Thời khóa biểu) ---
+    let schSheet = ss.getSheetByName(SHEETS.SCHEDULES);
+    if (!schSheet) {
+      schSheet = ss.insertSheet(SHEETS.SCHEDULES);
+      schSheet.appendRow([
+        'id', 'userId', 'date', 'startTime', 'endTime', 'title', 'type',
+        'description', 'location', 'completed', 'note', 'createdAt'
+      ]);
+      Logger.log('Đã tạo sheet Schedules');
+    }
+
+    const existingSch = getSheetDataFromSheet(schSheet);
+    if (existingSch.length === 0) {
+      const users = getSheetDataFromSheet(usersSheet);
+      const userId = users[0] ? users[0].id : '';
+      const now = new Date().toISOString();
+      const today = new Date();
+      const year = today.getFullYear();
+      const month = ('0' + (today.getMonth() + 1)).slice(-2);
+      const day = ('0' + today.getDate()).slice(-2);
+      const dateStr = year + '-' + month + '-' + day;
+
+      const sampleSchedules = [
+        [userId, dateStr, '07:00', '07:30', 'Thức dậy & tập thể dục', 'Cá nhân', 'Chạy bộ nhẹ', 'Nhà', false, ''],
+        [userId, dateStr, '08:00', '09:00', 'Ăn sáng & chuẩn bị', 'Cá nhân', '', 'Nhà', false, ''],
+        [userId, dateStr, '09:00', '12:00', 'Làm việc buổi sáng', 'Công việc', 'Xử lý email, báo cáo', 'Văn phòng', false, ''],
+        [userId, dateStr, '12:00', '13:00', 'Nghỉ trưa', 'Cá nhân', 'Ăn trưa', 'Nhà hàng', false, ''],
+        [userId, dateStr, '13:30', '17:00', 'Họp & làm việc nhóm', 'Họp', 'Review dự án tuần', 'Phòng họp', false, ''],
+        [userId, dateStr, '19:00', '20:00', 'Học online', 'Học tập', 'Khóa tiếng Anh', 'Online', false, '']
+      ];
+
+      sampleSchedules.forEach(function(row) {
+        schSheet.appendRow([generateId()].concat(row).concat([now]));
+      });
+      Logger.log('Đã thêm thời khóa biểu mẫu');
     }
 
     SpreadsheetApp.flush();
@@ -603,4 +653,136 @@ function getSummaryByYear(userId, year) {
       months
     }
   };
+}
+
+// ==================== SCHEDULES (THỜI KHÓA BIỂU) ====================
+
+/**
+ * Lấy danh sách thời khóa biểu
+ */
+function getSchedules(userId, filters) {
+  var schedules = getSheetData(SHEETS.SCHEDULES);
+
+  if (userId) {
+    schedules = schedules.filter(function(s) { return s.userId === userId; });
+  }
+
+  if (filters && filters.date) {
+    schedules = schedules.filter(function(s) {
+      return String(s.date).split('T')[0] === String(filters.date).split('T')[0];
+    });
+  }
+
+  if (filters && filters.year && filters.month) {
+    schedules = schedules.filter(function(s) {
+      var d = new Date(s.date);
+      return d.getFullYear() === Number(filters.year) && d.getMonth() + 1 === Number(filters.month);
+    });
+  }
+
+  schedules.sort(function(a, b) {
+    var dateCmp = String(a.date).localeCompare(String(b.date));
+    if (dateCmp !== 0) return dateCmp;
+    return String(a.startTime).localeCompare(String(b.startTime));
+  });
+
+  return { success: true, data: schedules };
+}
+
+/**
+ * Thêm mục thời khóa biểu
+ */
+function addSchedule(schedule) {
+  if (!schedule.date || !schedule.startTime || !schedule.endTime || !schedule.title) {
+    return { success: false, message: 'Thiếu thông tin bắt buộc (ngày, giờ bắt đầu/kết thúc, tiêu đề)' };
+  }
+
+  var sheet = getSheet(SHEETS.SCHEDULES);
+  if (!sheet) {
+    return { success: false, message: 'Chưa có sheet Schedules. Chạy setupSheets() hoặc tạo sheet thủ công.' };
+  }
+
+  var id = generateId();
+  var now = new Date().toISOString();
+
+  sheet.appendRow([
+    id,
+    schedule.userId,
+    schedule.date,
+    schedule.startTime,
+    schedule.endTime,
+    schedule.title,
+    schedule.type || 'Công việc',
+    schedule.description || '',
+    schedule.location || '',
+    schedule.completed || false,
+    schedule.note || '',
+    now
+  ]);
+
+  return {
+    success: true,
+    data: { id: id, userId: schedule.userId, date: schedule.date, startTime: schedule.startTime,
+      endTime: schedule.endTime, title: schedule.title, type: schedule.type || 'Công việc',
+      description: schedule.description || '', location: schedule.location || '',
+      completed: schedule.completed || false, note: schedule.note || '', createdAt: now }
+  };
+}
+
+/**
+ * Cập nhật thời khóa biểu
+ */
+function updateSchedule(id, schedule) {
+  var sheet = getSheet(SHEETS.SCHEDULES);
+  if (!sheet) {
+    return { success: false, message: 'Chưa có sheet Schedules' };
+  }
+
+  var rowIndex = findRowIndex(sheet, id);
+  if (rowIndex === -1) {
+    return { success: false, message: 'Không tìm thấy mục thời khóa biểu' };
+  }
+
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  var fieldMap = {
+    userId: schedule.userId,
+    date: schedule.date,
+    startTime: schedule.startTime,
+    endTime: schedule.endTime,
+    title: schedule.title,
+    type: schedule.type,
+    description: schedule.description,
+    location: schedule.location,
+    completed: schedule.completed,
+    note: schedule.note
+  };
+
+  headers.forEach(function(header, i) {
+    if (fieldMap[header] !== undefined) {
+      sheet.getRange(rowIndex, i + 1).setValue(fieldMap[header]);
+    }
+  });
+
+  return { success: true, data: { id: id, userId: schedule.userId, date: schedule.date,
+    startTime: schedule.startTime, endTime: schedule.endTime, title: schedule.title,
+    type: schedule.type, description: schedule.description, location: schedule.location,
+    completed: schedule.completed, note: schedule.note } };
+}
+
+/**
+ * Xóa thời khóa biểu
+ */
+function deleteSchedule(id) {
+  var sheet = getSheet(SHEETS.SCHEDULES);
+  if (!sheet) {
+    return { success: false, message: 'Chưa có sheet Schedules' };
+  }
+
+  var rowIndex = findRowIndex(sheet, id);
+  if (rowIndex === -1) {
+    return { success: false, message: 'Không tìm thấy mục thời khóa biểu' };
+  }
+
+  sheet.deleteRow(rowIndex);
+  return { success: true, message: 'Đã xóa mục thời khóa biểu' };
 }

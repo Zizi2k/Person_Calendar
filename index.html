@@ -25,6 +25,7 @@
       <button class="nav-tab" data-section="family">Chi gia đình</button>
       <button class="nav-tab" data-section="income">Thu nhập</button>
       <button class="nav-tab" data-section="categories">Loại chi</button>
+      <button class="nav-tab" data-section="schedule">Thời khóa biểu</button>
       <button class="nav-tab" data-section="summary">Tổng kết</button>
     </nav>
 
@@ -357,6 +358,116 @@
               <tr>
                 <th>Tên</th>
                 <th>Loại</th>
+                <th>Thao tác</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== SCHEDULE (THỜI KHÓA BIỂU) ==================== -->
+    <section class="section" id="section-schedule">
+      <div class="card">
+        <div class="card-title" id="scheduleFormTitle">Thêm lịch làm việc</div>
+        <form id="scheduleForm" novalidate>
+          <input type="hidden" id="scheduleId">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="scheduleDate">Ngày *</label>
+              <input type="date" id="scheduleDate" required>
+              <span class="error-msg">Vui lòng chọn ngày</span>
+            </div>
+            <div class="form-group">
+              <label for="scheduleStart">Giờ bắt đầu *</label>
+              <input type="time" id="scheduleStart" required>
+              <span class="error-msg">Vui lòng chọn giờ bắt đầu</span>
+            </div>
+            <div class="form-group">
+              <label for="scheduleEnd">Giờ kết thúc *</label>
+              <input type="time" id="scheduleEnd" required>
+              <span class="error-msg">Vui lòng chọn giờ kết thúc</span>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="scheduleTitle">Tiêu đề *</label>
+              <input type="text" id="scheduleTitle" placeholder="VD: Họp team, Làm việc..." required>
+              <span class="error-msg">Vui lòng nhập tiêu đề</span>
+            </div>
+            <div class="form-group">
+              <label for="scheduleType">Loại</label>
+              <select id="scheduleType">
+                <option value="Công việc">Công việc</option>
+                <option value="Học tập">Học tập</option>
+                <option value="Họp">Họp</option>
+                <option value="Cá nhân">Cá nhân</option>
+                <option value="Khác">Khác</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="scheduleLocation">Địa điểm</label>
+              <input type="text" id="scheduleLocation" placeholder="VD: Văn phòng, Online...">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="scheduleDesc">Mô tả</label>
+              <input type="text" id="scheduleDesc" placeholder="Chi tiết công việc">
+            </div>
+            <div class="form-group">
+              <label for="scheduleNote">Ghi chú</label>
+              <input type="text" id="scheduleNote" placeholder="Ghi chú thêm">
+            </div>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Lưu</button>
+            <button type="button" class="btn btn-secondary" id="scheduleCancelBtn" style="display:none">Hủy</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Lịch làm việc trong ngày</div>
+        <div class="schedule-day-controls">
+          <button class="btn btn-secondary btn-sm" id="schedulePrevDay">&larr;</button>
+          <div class="schedule-day-label" id="scheduleDayLabel">--</div>
+          <button class="btn btn-secondary btn-sm" id="scheduleNextDay">&rarr;</button>
+          <button class="btn btn-secondary btn-sm" id="scheduleTodayBtn">Hôm nay</button>
+        </div>
+
+        <div class="timetable" id="timetable">
+          <!-- Render bởi app.js -->
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Danh sách lịch tháng</div>
+        <div class="filter-bar">
+          <div class="form-group">
+            <label>Tháng</label>
+            <select id="scheduleFilterMonth"></select>
+          </div>
+          <div class="form-group">
+            <label>Năm</label>
+            <select id="scheduleFilterYear"></select>
+          </div>
+          <div class="form-group search-input">
+            <label>Tìm kiếm</label>
+            <input type="text" id="scheduleSearch" placeholder="Tìm theo tiêu đề, địa điểm...">
+          </div>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="data-table" id="scheduleTable">
+            <thead>
+              <tr>
+                <th>Ngày</th>
+                <th>Giờ</th>
+                <th>Tiêu đề</th>
+                <th>Loại</th>
+                <th>Địa điểm</th>
+                <th>Hoàn thành</th>
                 <th>Thao tác</th>
               </tr>
             </thead>
