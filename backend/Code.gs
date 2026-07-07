@@ -93,8 +93,53 @@ function createResponse(data) {
 
 // ==================== SHEET HELPERS ====================
 
+/**
+ * Lấy spreadsheet đang làm việc
+ * Ưu tiên file đang mở (khi chạy từ Extensions > Apps Script trong Sheets)
+ */
 function getSpreadsheet() {
-  return SpreadsheetApp.openById(SPREADSHEET_ID);
+  try {
+    const active = SpreadsheetApp.getActiveSpreadsheet();
+    if (active) {
+      Logger.log('Dùng spreadsheet đang mở: ' + active.getName() + ' | ID: ' + active.getId());
+      return active;
+    }
+  } catch (e) {
+    Logger.log('Không có spreadsheet đang mở, dùng openById: ' + e.message);
+  }
+
+  if (!SPREADSHEET_ID || SPREADSHEET_ID === 'YOUR_SPREADSHEET_ID') {
+    throw new Error('Chưa cấu hình SPREADSHEET_ID. Hãy mở Google Sheets > Extensions > Apps Script rồi chạy lại.');
+  }
+
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  Logger.log('Dùng openById: ' + ss.getName() + ' | ID: ' + ss.getId());
+  return ss;
+}
+
+/**
+ * Kiểm tra kết nối - CHẠY HÀM NÀY TRƯỚC để xem script đang trỏ vào file nào
+ */
+function diagnoseSetup() {
+  const ss = getSpreadsheet();
+  const sheetNames = ss.getSheets().map(function(s) { return s.getName(); });
+
+  const info = [
+    'Tên file: ' + ss.getName(),
+    'ID: ' + ss.getId(),
+    'URL: ' + ss.getUrl(),
+    'Các sheet hiện có: ' + sheetNames.join(', ')
+  ].join('\n');
+
+  Logger.log(info);
+
+  try {
+    SpreadsheetApp.getUi().alert('Chẩn đoán kết nối', info, SpreadsheetApp.getUi().ButtonSet.OK);
+  } catch (e) {
+    Logger.log('Chạy từ editor độc lập - xem log để biết kết quả');
+  }
+
+  return info;
 }
 
 function getSheet(name) {
@@ -143,82 +188,134 @@ function findRowIndex(sheet, id) {
 
 /**
  * Chạy hàm này MỘT LẦN để tạo sheets và dữ liệu mẫu
- * Extensions > Apps Script > Chọn setupSheets > Run
+ *
+ * QUAN TRỌNG: Mở Google Sheets trước, rồi vào Extensions > Apps Script, chạy hàm này
+ * Hoặc chạy diagnoseSetup() trước để kiểm tra đúng file chưa
  */
 function setupSheets() {
-  const ss = getSpreadsheet();
+  try {
+    const ss = getSpreadsheet();
+    Logger.log('Bắt đầu setup trên file: ' + ss.getName() + ' (' + ss.getId() + ')');
 
-  // --- Users ---
-  let usersSheet = ss.getSheetByName(SHEETS.USERS);
-  if (!usersSheet) {
-    usersSheet = ss.insertSheet(SHEETS.USERS);
-    usersSheet.appendRow(['id', 'username', 'password', 'fullname', 'role', 'createdAt']);
-    usersSheet.getRange('C:C').setNumberFormat('@'); // Cột password lưu dạng text
+    // --- Users ---
+    let usersSheet = ss.getSheetByName(SHEETS.USERS);
+    if (!usersSheet) {
+      usersSheet = ss.insertSheet(SHEETS.USERS);
+      usersSheet.appendRow(['id', 'username', 'password', 'fullname', 'role', 'createdAt']);
+      usersSheet.getRange('C:C').setNumberFormat('@');
+      Logger.log('Đã tạo sheet Users');
+    }
+
+    const existingUsers = getSheetDataFromSheet(usersSheet);
+    if (existingUsers.length === 0) {
+      const now = new Date().toISOString();
+      usersSheet.appendRow([generateId(), 'admin', '123456', 'Quản trị viên', 'admin', now]);
+      usersSheet.appendRow([generateId(), 'user1', 'password', 'Nguyễn Văn A', 'user', now]);
+      Logger.log('Đã thêm tài khoản mẫu');
+    }
+
+    // --- Categories ---
+    let catSheet = ss.getSheetByName(SHEETS.CATEGORIES);
+    if (!catSheet) {
+      catSheet = ss.insertSheet(SHEETS.CATEGORIES);
+      catSheet.appendRow(['id', 'name', 'type', 'createdAt']);
+      Logger.log('Đã tạo sheet Categories');
+    }
+
+    const existingCats = getSheetDataFromSheet(catSheet);
+    if (existingCats.length === 0) {
+      const now = new Date().toISOString();
+      const defaultCategories = [
+        'Ăn uống', 'Đi lại', 'Học tập', 'Nhà ở', 'Điện nước',
+        'Internet', 'Giải trí', 'Sức khỏe', 'Gia đình', 'Khác'
+      ];
+      defaultCategories.forEach(function(name) {
+        catSheet.appendRow([generateId(), name, 'expense', now]);
+      });
+      Logger.log('Đã thêm loại chi tiêu mẫu');
+    }
+
+    // --- Transactions ---
+    let txSheet = ss.getSheetByName(SHEETS.TRANSACTIONS);
+    if (!txSheet) {
+      txSheet = ss.insertSheet(SHEETS.TRANSACTIONS);
+      txSheet.appendRow([
+        'id', 'userId', 'type', 'groupType', 'amount', 'category',
+        'description', 'paymentMethod', 'date', 'note', 'paid', 'createdAt'
+      ]);
+      Logger.log('Đã tạo sheet Transactions');
+    }
+
+    const existingTx = getSheetDataFromSheet(txSheet);
+    if (existingTx.length === 0) {
+      const users = getSheetDataFromSheet(usersSheet);
+      const userId = users[0] ? users[0].id : '';
+      const now = new Date().toISOString();
+      const today = new Date();
+      const year = today.getFullYear();
+      const month = ('0' + (today.getMonth() + 1)).slice(-2);
+
+      const sampleData = [
+        [userId, 'income', 'personal', 15000000, 'Lương', 'Lương tháng', '', year + '-' + month + '-05', 'Lương chính', false],
+        [userId, 'expense', 'personal', 50000, 'Ăn uống', 'Cơm trưa', 'Tiền mặt', year + '-' + month + '-07', '', true],
+        [userId, 'expense', 'personal', 35000, 'Đi lại', 'Xe buýt', 'Tiền mặt', year + '-' + month + '-07', '', true],
+        [userId, 'expense', 'family', 500000, 'Điện nước', 'Tiền điện tháng', 'Bố', year + '-' + month + '-10', 'Hóa đơn EVN', false],
+        [userId, 'expense', 'personal', 200000, 'Giải trí', 'Xem phim', 'Thẻ', year + '-' + month + '-12', '', false],
+        [userId, 'expense', 'family', 300000, 'Ăn uống', 'Đi chợ', 'Mẹ', year + '-' + month + '-15', 'Thực phẩm', true],
+        [userId, 'income', 'personal', 2000000, 'Thưởng', 'Thưởng dự án', '', year + '-' + month + '-20', '', false],
+        [userId, 'expense', 'personal', 150000, 'Internet', 'Cước internet', 'Chuyển khoản', year + '-' + month + '-22', '', false]
+      ];
+
+      sampleData.forEach(function(row) {
+        txSheet.appendRow([generateId()].concat(row).concat([now]));
+      });
+      Logger.log('Đã thêm giao dịch mẫu');
+    }
+
+    SpreadsheetApp.flush();
+
+    const message = 'Setup hoàn tất!\nFile: ' + ss.getName() + '\nURL: ' + ss.getUrl();
+    Logger.log(message);
+
+    try {
+      SpreadsheetApp.getUi().alert('Thành công', message, SpreadsheetApp.getUi().ButtonSet.OK);
+    } catch (e) {
+      Logger.log('Hoàn tất - mở Google Sheets để kiểm tra 3 tab: Users, Transactions, Categories');
+    }
+
+  } catch (error) {
+    const errMsg = 'Lỗi setupSheets: ' + error.message;
+    Logger.log(errMsg);
+    try {
+      SpreadsheetApp.getUi().alert('Lỗi', errMsg, SpreadsheetApp.getUi().ButtonSet.OK);
+    } catch (e) {
+      Logger.log(errMsg);
+    }
+    throw error;
   }
+}
 
-  const existingUsers = getSheetData(SHEETS.USERS);
-  if (existingUsers.length === 0) {
-    const now = new Date().toISOString();
-    usersSheet.appendRow([generateId(), 'admin', '123456', 'Quản trị viên', 'admin', now]);
-    usersSheet.appendRow([generateId(), 'user1', 'password', 'Nguyễn Văn A', 'user', now]);
-  }
+/** Đọc dữ liệu trực tiếp từ sheet object (dùng trong setupSheets) */
+function getSheetDataFromSheet(sheet) {
+  if (!sheet) return [];
 
-  // --- Categories ---
-  let catSheet = ss.getSheetByName(SHEETS.CATEGORIES);
-  if (!catSheet) {
-    catSheet = ss.insertSheet(SHEETS.CATEGORIES);
-    catSheet.appendRow(['id', 'name', 'type', 'createdAt']);
-  }
+  const data = sheet.getDataRange().getValues();
+  if (data.length <= 1) return [];
 
-  const existingCats = getSheetData(SHEETS.CATEGORIES);
-  if (existingCats.length === 0) {
-    const now = new Date().toISOString();
-    const defaultCategories = [
-      'Ăn uống', 'Đi lại', 'Học tập', 'Nhà ở', 'Điện nước',
-      'Internet', 'Giải trí', 'Sức khỏe', 'Gia đình', 'Khác'
-    ];
-    defaultCategories.forEach(name => {
-      catSheet.appendRow([generateId(), name, 'expense', now]);
+  const headers = data[0];
+  const rows = [];
+
+  for (var i = 1; i < data.length; i++) {
+    const row = {};
+    var hasData = false;
+    headers.forEach(function(header, j) {
+      row[header] = data[i][j];
+      if (data[i][j] !== '' && data[i][j] !== null) hasData = true;
     });
+    if (hasData) rows.push(row);
   }
 
-  // --- Transactions ---
-  let txSheet = ss.getSheetByName(SHEETS.TRANSACTIONS);
-  if (!txSheet) {
-    txSheet = ss.insertSheet(SHEETS.TRANSACTIONS);
-    txSheet.appendRow([
-      'id', 'userId', 'type', 'groupType', 'amount', 'category',
-      'description', 'paymentMethod', 'date', 'note', 'paid', 'createdAt'
-    ]);
-  }
-
-  // Thêm dữ liệu mẫu nếu chưa có
-  const existingTx = getSheetData(SHEETS.TRANSACTIONS);
-  if (existingTx.length === 0) {
-    const users = getSheetData(SHEETS.USERS);
-    const userId = users[0] ? users[0].id : '';
-    const now = new Date().toISOString();
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-
-    const sampleData = [
-      [userId, 'income', 'personal', 15000000, 'Lương', 'Lương tháng', '', `${year}-${month}-05`, 'Lương chính', false],
-      [userId, 'expense', 'personal', 50000, 'Ăn uống', 'Cơm trưa', 'Tiền mặt', `${year}-${month}-07`, '', true],
-      [userId, 'expense', 'personal', 35000, 'Đi lại', 'Xe buýt', 'Tiền mặt', `${year}-${month}-07`, '', true],
-      [userId, 'expense', 'family', 500000, 'Điện nước', 'Tiền điện tháng', 'Bố', `${year}-${month}-10`, 'Hóa đơn EVN', false],
-      [userId, 'expense', 'personal', 200000, 'Giải trí', 'Xem phim', 'Thẻ', `${year}-${month}-12`, '', false],
-      [userId, 'expense', 'family', 300000, 'Ăn uống', 'Đi chợ', 'Mẹ', `${year}-${month}-15`, 'Thực phẩm', true],
-      [userId, 'income', 'personal', 2000000, 'Thưởng', 'Thưởng dự án', '', `${year}-${month}-20`, '', false],
-      [userId, 'expense', 'personal', 150000, 'Internet', 'Cước internet', 'Chuyển khoản', `${year}-${month}-22`, '', false],
-    ];
-
-    sampleData.forEach(row => {
-      txSheet.appendRow([generateId(), ...row, now]);
-    });
-  }
-
-  Logger.log('Setup hoàn tất! Sheets và dữ liệu mẫu đã được tạo.');
+  return rows;
 }
 
 // ==================== AUTH ====================
