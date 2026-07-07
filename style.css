@@ -295,6 +295,11 @@ body {
   gap: 12px;
   font-size: 0.9rem;
   color: var(--gray-700);
+  flex-wrap: wrap;
+}
+
+.user-info a.btn {
+  text-decoration: none;
 }
 
 /* Navigation */
