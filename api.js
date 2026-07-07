@@ -4,7 +4,7 @@
  * HƯỚNG DẪN: Thay YOUR_GAS_WEB_APP_URL bằng URL Web App sau khi deploy GAS
  * Ví dụ: https://script.google.com/macros/s/AKfycbx.../exec
  */
-const API_BASE_URL = 'YOUR_GAS_WEB_APP_URL';
+const API_BASE_URL = 'https://script.google.com/macros/s/AKfycbzEMjTyGACvyBxViGcpggX2tYK97pEDwe50o6y_I8cOL_P9D5ncPsdl35dZXtsbSLNzsg/exec';
 
 /**
  * Gửi request tới Google Apps Script
