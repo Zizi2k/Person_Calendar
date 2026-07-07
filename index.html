@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Personal Finance Calendar</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <h1>PERSONAL FINANCE CALENDAR</h1>
+      <div class="datetime-box" id="datetimeBox">--</div>
+      <div class="user-info">
+        <span>Xin chào, <strong id="userFullname">--</strong></span>
+        <button class="btn btn-secondary btn-sm" id="logoutBtn">Đăng xuất</button>
+      </div>
+    </header>
+
+    <!-- Navigation -->
+    <nav class="nav-tabs" id="navTabs">
+      <button class="nav-tab active" data-section="dashboard">Tổng quan</button>
+      <button class="nav-tab" data-section="personal">Chi cá nhân</button>
+      <button class="nav-tab" data-section="family">Chi gia đình</button>
+      <button class="nav-tab" data-section="income">Thu nhập</button>
+      <button class="nav-tab" data-section="categories">Loại chi</button>
+      <button class="nav-tab" data-section="summary">Tổng kết</button>
+    </nav>
+
+    <!-- ==================== DASHBOARD ==================== -->
+    <section class="section active" id="section-dashboard">
+      <div class="stats-grid" id="statsGrid">
+        <div class="stat-card income">
+          <div class="label">Tổng thu tháng</div>
+          <div class="value" id="statIncome">0 ₫</div>
+        </div>
+        <div class="stat-card expense">
+          <div class="label">Tổng chi tháng</div>
+          <div class="value" id="statExpense">0 ₫</div>
+        </div>
+        <div class="stat-card balance">
+          <div class="label">Số dư còn lại</div>
+          <div class="value" id="statBalance">0 ₫</div>
+        </div>
+        <div class="stat-card family">
+          <div class="label">Chi gia đình</div>
+          <div class="value" id="statFamily">0 ₫</div>
+        </div>
+        <div class="stat-card personal">
+          <div class="label">Chi cá nhân</div>
+          <div class="value" id="statPersonal">0 ₫</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Thống kê theo loại chi tiêu</div>
+        <div class="chart-container" id="categoryChart"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Lịch tháng</div>
+        <div class="calendar-controls">
+          <button class="btn btn-secondary btn-sm" id="prevMonth">&larr;</button>
+          <h2 id="calendarTitle">--</h2>
+          <button class="btn btn-secondary btn-sm" id="nextMonth">&rarr;</button>
+        </div>
+        <div class="calendar-grid" id="calendarGrid"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Chi tiết từng ngày</div>
+        <div class="daily-list" id="dailyList"></div>
+      </div>
+    </section>
+
+    <!-- ==================== PERSONAL EXPENSE ==================== -->
+    <section class="section" id="section-personal">
+      <div class="card">
+        <div class="card-title" id="personalFormTitle">Thêm chi tiêu cá nhân</div>
+        <form id="personalForm" novalidate>
+          <input type="hidden" id="personalId">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="personalDate">Ngày *</label>
+              <input type="date" id="personalDate" required>
+              <span class="error-msg">Vui lòng chọn ngày</span>
+            </div>
+            <div class="form-group">
+              <label for="personalAmount">Số tiền (VNĐ) *</label>
+              <input type="number" id="personalAmount" min="1" placeholder="0" required>
+              <span class="error-msg">Vui lòng nhập số tiền</span>
+            </div>
+            <div class="form-group">
+              <label for="personalCategory">Loại chi tiêu *</label>
+              <select id="personalCategory" required>
+                <option value="">-- Chọn loại --</option>
+              </select>
+              <span class="error-msg">Vui lòng chọn loại chi tiêu</span>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="personalPayment">Phương thức thanh toán</label>
+              <select id="personalPayment">
+                <option value="Tiền mặt">Tiền mặt</option>
+                <option value="Chuyển khoản">Chuyển khoản</option>
+                <option value="Thẻ">Thẻ</option>
+                <option value="Ví điện tử">Ví điện tử</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="personalDesc">Mô tả</label>
+              <input type="text" id="personalDesc" placeholder="Mô tả giao dịch">
+            </div>
+            <div class="form-group">
+              <label for="personalNote">Ghi chú</label>
+              <input type="text" id="personalNote" placeholder="Ghi chú thêm">
+            </div>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Lưu</button>
+            <button type="button" class="btn btn-secondary" id="personalCancelBtn" style="display:none">Hủy</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Danh sách chi tiêu cá nhân</div>
+        <div class="filter-bar">
+          <div class="form-group">
+            <label>Tháng</label>
+            <select id="personalFilterMonth"></select>
+          </div>
+          <div class="form-group">
+            <label>Năm</label>
+            <select id="personalFilterYear"></select>
+          </div>
+          <div class="form-group search-input">
+            <label>Tìm kiếm</label>
+            <input type="text" id="personalSearch" placeholder="Tìm theo mô tả, loại...">
+          </div>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="data-table" id="personalTable">
+            <thead>
+              <tr>
+                <th>Ngày</th>
+                <th>Số tiền</th>
+                <th>Loại</th>
+                <th>Mô tả</th>
+                <th>Thanh toán</th>
+                <th>Đã TT</th>
+                <th>Thao tác</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== FAMILY EXPENSE ==================== -->
+    <section class="section" id="section-family">
+      <div class="card">
+        <div class="card-title" id="familyFormTitle">Thêm chi tiêu gia đình</div>
+        <form id="familyForm" novalidate>
+          <input type="hidden" id="familyId">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="familyDate">Ngày *</label>
+              <input type="date" id="familyDate" required>
+              <span class="error-msg">Vui lòng chọn ngày</span>
+            </div>
+            <div class="form-group">
+              <label for="familyAmount">Số tiền (VNĐ) *</label>
+              <input type="number" id="familyAmount" min="1" placeholder="0" required>
+              <span class="error-msg">Vui lòng nhập số tiền</span>
+            </div>
+            <div class="form-group">
+              <label for="familyCategory">Loại chi tiêu *</label>
+              <select id="familyCategory" required>
+                <option value="">-- Chọn loại --</option>
+              </select>
+              <span class="error-msg">Vui lòng chọn loại chi tiêu</span>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="familyPerson">Người chi</label>
+              <input type="text" id="familyPerson" placeholder="Tên người chi">
+            </div>
+            <div class="form-group">
+              <label for="familyDesc">Mô tả</label>
+              <input type="text" id="familyDesc" placeholder="Mô tả giao dịch">
+            </div>
+            <div class="form-group">
+              <label for="familyNote">Ghi chú</label>
+              <input type="text" id="familyNote" placeholder="Ghi chú thêm">
+            </div>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Lưu</button>
+            <button type="button" class="btn btn-secondary" id="familyCancelBtn" style="display:none">Hủy</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Danh sách chi tiêu gia đình</div>
+        <div class="filter-bar">
+          <div class="form-group">
+            <label>Tháng</label>
+            <select id="familyFilterMonth"></select>
+          </div>
+          <div class="form-group">
+            <label>Năm</label>
+            <select id="familyFilterYear"></select>
+          </div>
+          <div class="form-group search-input">
+            <label>Tìm kiếm</label>
+            <input type="text" id="familySearch" placeholder="Tìm theo mô tả, người chi...">
+          </div>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="data-table" id="familyTable">
+            <thead>
+              <tr>
+                <th>Ngày</th>
+                <th>Số tiền</th>
+                <th>Loại</th>
+                <th>Người chi</th>
+                <th>Mô tả</th>
+                <th>Đã TT</th>
+                <th>Thao tác</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== INCOME ==================== -->
+    <section class="section" id="section-income">
+      <div class="card">
+        <div class="card-title" id="incomeFormTitle">Thêm khoản thu</div>
+        <form id="incomeForm" novalidate>
+          <input type="hidden" id="incomeId">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="incomeDate">Ngày *</label>
+              <input type="date" id="incomeDate" required>
+              <span class="error-msg">Vui lòng chọn ngày</span>
+            </div>
+            <div class="form-group">
+              <label for="incomeAmount">Số tiền (VNĐ) *</label>
+              <input type="number" id="incomeAmount" min="1" placeholder="0" required>
+              <span class="error-msg">Vui lòng nhập số tiền</span>
+            </div>
+            <div class="form-group">
+              <label for="incomeSource">Nguồn thu *</label>
+              <select id="incomeSource" required>
+                <option value="">-- Chọn nguồn --</option>
+                <option value="Lương">Lương</option>
+                <option value="Thưởng">Thưởng</option>
+                <option value="Đầu tư">Đầu tư</option>
+                <option value="Kinh doanh">Kinh doanh</option>
+                <option value="Khác">Khác</option>
+              </select>
+              <span class="error-msg">Vui lòng chọn nguồn thu</span>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="incomeDesc">Mô tả</label>
+              <input type="text" id="incomeDesc" placeholder="Mô tả khoản thu">
+            </div>
+            <div class="form-group">
+              <label for="incomeNote">Ghi chú</label>
+              <input type="text" id="incomeNote" placeholder="Ghi chú thêm">
+            </div>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Lưu</button>
+            <button type="button" class="btn btn-secondary" id="incomeCancelBtn" style="display:none">Hủy</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Danh sách thu nhập</div>
+        <div class="filter-bar">
+          <div class="form-group">
+            <label>Tháng</label>
+            <select id="incomeFilterMonth"></select>
+          </div>
+          <div class="form-group">
+            <label>Năm</label>
+            <select id="incomeFilterYear"></select>
+          </div>
+          <div class="form-group search-input">
+            <label>Tìm kiếm</label>
+            <input type="text" id="incomeSearch" placeholder="Tìm theo mô tả, nguồn...">
+          </div>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="data-table" id="incomeTable">
+            <thead>
+              <tr>
+                <th>Ngày</th>
+                <th>Số tiền</th>
+                <th>Nguồn thu</th>
+                <th>Mô tả</th>
+                <th>Ghi chú</th>
+                <th>Thao tác</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== CATEGORIES ==================== -->
+    <section class="section" id="section-categories">
+      <div class="card">
+        <div class="card-title" id="categoryFormTitle">Thêm loại chi tiêu</div>
+        <form id="categoryForm" novalidate>
+          <input type="hidden" id="categoryId">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="categoryName">Tên loại *</label>
+              <input type="text" id="categoryName" placeholder="Tên loại chi tiêu" required>
+              <span class="error-msg">Vui lòng nhập tên loại</span>
+            </div>
+            <div class="form-group">
+              <label for="categoryType">Loại *</label>
+              <select id="categoryType" required>
+                <option value="expense">Chi tiêu</option>
+                <option value="income">Thu nhập</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Lưu</button>
+            <button type="button" class="btn btn-secondary" id="categoryCancelBtn" style="display:none">Hủy</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Danh sách loại chi tiêu</div>
+        <div style="overflow-x:auto">
+          <table class="data-table" id="categoryTable">
+            <thead>
+              <tr>
+                <th>Tên</th>
+                <th>Loại</th>
+                <th>Thao tác</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== SUMMARY ==================== -->
+    <section class="section" id="section-summary">
+      <div class="card">
+        <div class="card-title">Tổng kết tài chính</div>
+        <div class="filter-bar">
+          <div class="form-group">
+            <label>Chế độ xem</label>
+            <select id="summaryMode">
+              <option value="month">Theo tháng</option>
+              <option value="year">Theo năm</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Tháng</label>
+            <select id="summaryMonth"></select>
+          </div>
+          <div class="form-group">
+            <label>Năm</label>
+            <select id="summaryYear"></select>
+          </div>
+          <button class="btn btn-primary btn-sm" id="summaryLoadBtn">Xem tổng kết</button>
+        </div>
+
+        <div id="summaryContent"></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Loading -->
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner"></div>
+    <span>Đang xử lý...</span>
+  </div>
+
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script src="api.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

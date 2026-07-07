@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Đăng nhập - Personal Finance Calendar</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="login-page">
+    <div class="login-card">
+      <h1>PERSONAL FINANCE CALENDAR</h1>
+      <p class="subtitle">Quản lý tài chính cá nhân &amp; gia đình</p>
+
+      <form id="loginForm" novalidate>
+        <div class="form-group" id="usernameGroup">
+          <label for="username">Tên đăng nhập</label>
+          <input type="text" id="username" name="username" placeholder="Nhập username" autocomplete="username">
+          <span class="error-msg">Vui lòng nhập tên đăng nhập</span>
+        </div>
+
+        <div class="form-group" id="passwordGroup">
+          <label for="password">Mật khẩu</label>
+          <input type="password" id="password" name="password" placeholder="Nhập mật khẩu" autocomplete="current-password">
+          <span class="error-msg">Vui lòng nhập mật khẩu</span>
+        </div>
+
+        <button type="submit" class="btn btn-primary" id="loginBtn">Đăng nhập</button>
+      </form>
+
+      <p style="margin-top: 20px; font-size: 0.8rem; color: #9e9e9e;">
+        Tài khoản mẫu: <strong>admin</strong> / <strong>123456</strong>
+      </p>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner"></div>
+    <span>Đang xử lý...</span>
+  </div>
+
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script src="api.js"></script>
+  <script>
+    // Kiểm tra đã đăng nhập chưa
+    if (localStorage.getItem('pf_user')) {
+      window.location.href = 'index.html';
+    }
+
+    const loginForm = document.getElementById('loginForm');
+    const loadingOverlay = document.getElementById('loadingOverlay');
+
+    function showLoading(show) {
+      loadingOverlay.classList.toggle('active', show);
+    }
+
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      toast.textContent = message;
+      container.appendChild(toast);
+      setTimeout(() => toast.remove(), 3500);
+    }
+
+    function validateForm() {
+      let valid = true;
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value.trim();
+
+      document.getElementById('usernameGroup').classList.toggle('invalid', !username);
+      document.getElementById('passwordGroup').classList.toggle('invalid', !password);
+
+      if (!username || !password) valid = false;
+      return valid;
+    }
+
+    loginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!validateForm()) return;
+
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value.trim();
+
+      showLoading(true);
+      try {
+        const result = await apiLogin(username, password);
+        const user = result.data;
+
+        localStorage.setItem('pf_user', JSON.stringify(user));
+        showToast('Đăng nhập thành công!', 'success');
+
+        setTimeout(() => {
+          window.location.href = 'index.html';
+        }, 500);
+      } catch (error) {
+        showToast(error.message || 'Đăng nhập thất bại', 'error');
+      } finally {
+        showLoading(false);
+      }
+    });
+  </script>
+</body>
+</html>
