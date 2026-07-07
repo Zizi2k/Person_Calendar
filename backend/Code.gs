@@ -153,6 +153,7 @@ function setupSheets() {
   if (!usersSheet) {
     usersSheet = ss.insertSheet(SHEETS.USERS);
     usersSheet.appendRow(['id', 'username', 'password', 'fullname', 'role', 'createdAt']);
+    usersSheet.getRange('C:C').setNumberFormat('@'); // Cột password lưu dạng text
   }
 
   const existingUsers = getSheetData(SHEETS.USERS);
@@ -227,7 +228,13 @@ function setupSheets() {
  */
 function login(username, password) {
   const users = getSheetData(SHEETS.USERS);
-  const user = users.find(u => u.username === username && u.password === password);
+  const inputUser = String(username || '').trim();
+  const inputPass = String(password || '').trim();
+
+  const user = users.find(u =>
+    String(u.username || '').trim() === inputUser &&
+    String(u.password || '').trim() === inputPass
+  );
 
   if (!user) {
     return { success: false, message: 'Tên đăng nhập hoặc mật khẩu không đúng' };
